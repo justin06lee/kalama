@@ -110,3 +110,24 @@ func (r *Run) Log() []Keystroke    { return r.log }
 func (r *Run) Mode() Mode          { return r.mode }
 func (r *Run) Target() int         { return r.target }
 func (r *Run) Started() bool       { return !r.started.IsZero() }
+
+// GoalReached reports whether the run's completion condition is met.
+func (r *Run) GoalReached() bool {
+	switch r.mode {
+	case ModeWords:
+		return len(r.text) > 0 && r.cursor >= len(r.text)
+	case ModeTime:
+		return r.Started() &&
+			r.elapsed() >= time.Duration(r.target)*time.Second
+	default: // ModeZen
+		return false
+	}
+}
+
+// Duration is the time of the last keystroke relative to run start.
+func (r *Run) Duration() time.Duration {
+	if len(r.log) == 0 {
+		return 0
+	}
+	return r.log[len(r.log)-1].At
+}
