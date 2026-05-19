@@ -1,6 +1,7 @@
 package corpus
 
 import (
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
@@ -49,5 +50,54 @@ func TestScanEmptyDir(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Fatalf("expected no files, got %v", got)
+	}
+}
+
+func TestTextStreamNormalizesWhitespace(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "a.txt"), "one\ntwo\t three   four\n\nfive")
+	files, _ := Scan(dir)
+
+	s := NewTextStream(files, rand.New(rand.NewSource(1)))
+	var got []string
+	for i := 0; i < 5; i++ {
+		w, ok := s.Next()
+		if !ok {
+			t.Fatalf("stream ended early at %d", i)
+		}
+		got = append(got, w)
+	}
+	want := []string{"one", "two", "three", "four", "five"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+}
+
+func TestTextStreamRollsOverToAnotherFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "a.txt"), "x")
+	writeFile(t, filepath.Join(dir, "b.txt"), "y")
+	files, _ := Scan(dir)
+
+	s := NewTextStream(files, rand.New(rand.NewSource(1)))
+	// Two single-word files: 10 reads must all succeed (stream is endless).
+	for i := 0; i < 10; i++ {
+		if _, ok := s.Next(); !ok {
+			t.Fatalf("stream ended at read %d, expected endless", i)
+		}
+	}
+}
+
+func TestTextStreamSkipsNonUTF8(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "bad.txt"), []byte{0xff, 0xfe, 0xfd}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files, _ := Scan(dir)
+	s := NewTextStream(files, rand.New(rand.NewSource(1)))
+	if _, ok := s.Next(); ok {
+		t.Fatal("expected no words from a non-UTF8-only corpus")
 	}
 }
