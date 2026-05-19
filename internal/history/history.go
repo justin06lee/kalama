@@ -53,13 +53,18 @@ func Load() ([]Record, error) {
 	return recs, nil
 }
 
-// Append adds rec to the history file, creating it and its directory if needed.
+// Append adds rec to the history file. A missing file is created. If the
+// existing file is unparseable JSON, it is preserved as <path>.corrupt before
+// a fresh file is written, so a damaged history is never silently destroyed.
 func Append(rec Record) error {
 	p, err := Path()
 	if err != nil {
 		return err
 	}
-	recs, err := Load()
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return err
+	}
+	recs, err := readForAppend(p)
 	if err != nil {
 		return err
 	}
@@ -68,8 +73,46 @@ func Append(rec Record) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	return writeAtomic(p, data)
+}
+
+// readForAppend returns the records in the file at p. A missing file yields an
+// empty slice. A file that does not parse as JSON is renamed to p+".corrupt"
+// and an empty slice is returned, so the damaged data is preserved, not lost.
+func readForAppend(p string) ([]Record, error) {
+	data, err := os.ReadFile(p)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var recs []Record
+	if err := json.Unmarshal(data, &recs); err != nil {
+		if rerr := os.Rename(p, p+".corrupt"); rerr != nil {
+			return nil, rerr
+		}
+		return nil, nil
+	}
+	return recs, nil
+}
+
+// writeAtomic writes data to p via a temp file in p's directory followed by a
+// rename, so an interrupted write cannot leave p corrupt.
+func writeAtomic(p string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(p), ".history-*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.WriteFile(p, data, 0o644)
+	tmpName := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	return os.Rename(tmpName, p)
 }

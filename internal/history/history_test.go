@@ -39,11 +39,47 @@ func TestAppendThenLoadRoundTrips(t *testing.T) {
 
 func TestAppendAccumulates(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	_ = Append(Record{Mode: "words", Target: 25})
-	_ = Append(Record{Mode: "zen", Target: 0})
+	if err := Append(Record{Mode: "words", Target: 25}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Append(Record{Mode: "zen", Target: 0}); err != nil {
+		t.Fatal(err)
+	}
 	got, _ := Load()
 	if len(got) != 2 {
 		t.Fatalf("got %d records, want 2", len(got))
+	}
+}
+
+func TestAppendBacksUpCorruptFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	p := filepath.Join(dir, "shaw", "history.json")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	invalid := []byte("{not json")
+	if err := os.WriteFile(p, invalid, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Append(Record{Mode: "time", Target: 30}); err != nil {
+		t.Fatal(err)
+	}
+
+	backup, err := os.ReadFile(p + ".corrupt")
+	if err != nil {
+		t.Fatalf("expected corrupt backup file: %v", err)
+	}
+	if string(backup) != string(invalid) {
+		t.Fatalf("backup contents %q, want %q", backup, invalid)
+	}
+
+	got, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("got %d records, want 1", len(got))
 	}
 }
 
