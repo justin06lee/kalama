@@ -52,3 +52,44 @@ func TestViewportClampsAtTop(t *testing.T) {
 		t.Errorf("got start=%d count=%d, want 0,3", start, count)
 	}
 }
+
+func TestLineOfCursorOnWrapGap(t *testing.T) {
+	lines := WrapLines([]rune("aaa bbb ccc"), 7) // line0 [0,7), line1 [8,11)
+	if got := LineOfCursor(lines, 7); got != 0 {
+		t.Errorf("cursor on dropped separator: got line %d, want 0", got)
+	}
+}
+
+func TestLineOfCursorEmptyLines(t *testing.T) {
+	if got := LineOfCursor(nil, 5); got != 0 {
+		t.Errorf("got line %d, want 0", got)
+	}
+}
+
+func TestWrapLinesOverWideWord(t *testing.T) {
+	lines := WrapLines([]rune("abcdefghij"), 4)
+	want := []Line{{0, 4}, {4, 8}, {8, 10}}
+	if len(lines) != len(want) {
+		t.Fatalf("got %d lines, want %d: %+v", len(lines), len(want), lines)
+	}
+	for i, w := range want {
+		if lines[i] != w {
+			t.Errorf("line %d: got %+v, want %+v", i, lines[i], w)
+		}
+	}
+}
+
+func TestWrapLinesEmptyText(t *testing.T) {
+	lines := WrapLines(nil, 10)
+	if len(lines) != 1 || lines[0] != (Line{0, 0}) {
+		t.Errorf("got %+v, want [{0 0}]", lines)
+	}
+}
+
+func TestViewportClampsAtBottom(t *testing.T) {
+	lines := []Line{{0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 5}}
+	start, count := Viewport(lines, 4)
+	if start != 2 || count != 3 {
+		t.Errorf("got start=%d count=%d, want 2,3", start, count)
+	}
+}

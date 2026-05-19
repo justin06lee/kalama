@@ -2,6 +2,9 @@
 package tui
 
 // Line is a half-open rune-index range [Start,End) into the target text.
+// Lines are NOT necessarily contiguous: WrapLines drops word-separator spaces,
+// so a consumed separator leaves a one-rune gap between a line's End and the
+// next line's Start.
 type Line struct {
 	Start, End int
 }
@@ -37,10 +40,16 @@ func WrapLines(text []rune, width int) []Line {
 }
 
 // LineOfCursor returns the index of the line containing cursor (an index into
-// the text). A cursor at the very end maps to the last line.
+// the text). WrapLines drops word-separator spaces, so a cursor parked on such
+// a gap rune maps to the line that just ended. A cursor at the very end of the
+// text maps to the last line.
 func LineOfCursor(lines []Line, cursor int) int {
 	for i, ln := range lines {
 		if cursor >= ln.Start && cursor < ln.End {
+			return i
+		}
+		// cursor on a consumed separator gap immediately after this line
+		if cursor == ln.End && (i+1 >= len(lines) || cursor < lines[i+1].Start) {
 			return i
 		}
 	}
