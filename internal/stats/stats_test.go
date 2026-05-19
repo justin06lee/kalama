@@ -77,3 +77,66 @@ func TestComputeEmptyRunIsSafe(t *testing.T) {
 		t.Errorf("empty run should be all zero, got %+v", res)
 	}
 }
+
+func TestConsistencySteadyIsHigh(t *testing.T) {
+	if got := consistency([]float64{10, 10, 10}); got != 100 {
+		t.Errorf("steady samples: got %v, want 100", got)
+	}
+}
+
+func TestConsistencyVariableIsLow(t *testing.T) {
+	// mean 10, stddev 10 => CV 1 => 100*(1-1) = 0.
+	if got := consistency([]float64{0, 20}); got != 0 {
+		t.Errorf("variable samples: got %v, want 0", got)
+	}
+}
+
+func TestConsistencyTooFewSamples(t *testing.T) {
+	if got := consistency([]float64{42}); got != 0 {
+		t.Errorf("single sample: got %v, want 0", got)
+	}
+	if got := consistency(nil); got != 0 {
+		t.Errorf("nil samples: got %v, want 0", got)
+	}
+}
+
+func TestPerSecondWPMCumulative(t *testing.T) {
+	// Two correct keystrokes: one at 0.5s, one at 1.5s, run lasts 2s.
+	log := []run.Keystroke{
+		{At: 500 * time.Millisecond, Correct: true},
+		{At: 1500 * time.Millisecond, Correct: true},
+	}
+	got := perSecondWPM(log, 2*time.Second)
+	if len(got) != 2 {
+		t.Fatalf("got %d samples, want 2", len(got))
+	}
+	// Second 1: 1 correct char => (1/5)/(1/60) = 12 WPM.
+	if got[0] != 12 {
+		t.Errorf("sample 0: got %v, want 12", got[0])
+	}
+	// Second 2: 2 correct chars cumulative => (2/5)/(2/60) = 12 WPM.
+	if got[1] != 12 {
+		t.Errorf("sample 1: got %v, want 12", got[1])
+	}
+}
+
+func TestPerSecondInstantWPM(t *testing.T) {
+	// One correct keystroke in second 1, two in second 2.
+	log := []run.Keystroke{
+		{At: 200 * time.Millisecond, Correct: true},
+		{At: 1200 * time.Millisecond, Correct: true},
+		{At: 1800 * time.Millisecond, Correct: true},
+	}
+	got := perSecondInstantWPM(log, 2*time.Second)
+	if len(got) != 2 {
+		t.Fatalf("got %d samples, want 2", len(got))
+	}
+	// Second 1: 1 char => 1/5*60 = 12 WPM.
+	if got[0] != 12 {
+		t.Errorf("instant sample 0: got %v, want 12", got[0])
+	}
+	// Second 2: 2 chars => 2/5*60 = 24 WPM.
+	if got[1] != 24 {
+		t.Errorf("instant sample 1: got %v, want 24", got[1])
+	}
+}

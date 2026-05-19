@@ -9,6 +9,9 @@ import (
 	"github.com/justin06lee/shaw/internal/run"
 )
 
+// missCap is the maximum number of mistyped characters reported.
+const missCap = 5
+
 // CharCount pairs an expected character with how often it was mistyped.
 type CharCount struct {
 	Char  rune
@@ -32,7 +35,7 @@ func Compute(r *run.Run) Result {
 	log := r.Log()
 	res := Result{Mode: r.Mode(), Target: r.Target()}
 
-	var typed, correct, correctChars int
+	var typed, correct int
 	misses := map[rune]int{}
 	for _, k := range log {
 		if k.Backspace {
@@ -41,7 +44,6 @@ func Compute(r *run.Run) Result {
 		typed++
 		if k.Correct {
 			correct++
-			correctChars++
 		} else {
 			misses[k.Expected]++
 		}
@@ -53,11 +55,11 @@ func Compute(r *run.Run) Result {
 	mins := r.Duration().Minutes()
 	if mins > 0 {
 		res.RawWPM = float64(typed) / 5 / mins
-		res.NetWPM = float64(correctChars) / 5 / mins
+		res.NetWPM = float64(correct) / 5 / mins
 	}
 	res.Accuracy = float64(correct) / float64(typed)
 	res.Samples = perSecondWPM(log, r.Duration())
-	res.Consistency = consistency(res.Samples)
+	res.Consistency = consistency(perSecondInstantWPM(log, r.Duration()))
 	res.MissedChars = rankMisses(misses)
 	return res
 }
@@ -79,6 +81,34 @@ func perSecondWPM(log []run.Keystroke, dur time.Duration) []float64 {
 			correct++
 		}
 		out[i-1] = float64(correct) / 5 / (float64(i) / 60)
+	}
+	return out
+}
+
+// perSecondInstantWPM returns the net WPM achieved within each individual
+// elapsed second (not cumulative). Used for the consistency metric.
+func perSecondInstantWPM(log []run.Keystroke, dur time.Duration) []float64 {
+	secs := int(math.Ceil(dur.Seconds()))
+	if secs < 1 {
+		return nil
+	}
+	counts := make([]int, secs)
+	for _, k := range log {
+		if k.Backspace || !k.Correct {
+			continue
+		}
+		b := int(k.At.Seconds())
+		if b >= secs {
+			b = secs - 1
+		}
+		if b < 0 {
+			b = 0
+		}
+		counts[b]++
+	}
+	out := make([]float64, secs)
+	for i, c := range counts {
+		out[i] = float64(c) / 5 * 60 // correct chars in this second -> WPM
 	}
 	return out
 }
@@ -109,7 +139,7 @@ func consistency(samples []float64) float64 {
 	return c
 }
 
-// rankMisses sorts mistyped characters by count, descending, capped at 5.
+// rankMisses sorts mistyped characters by count, descending, capped at missCap.
 func rankMisses(misses map[rune]int) []CharCount {
 	out := make([]CharCount, 0, len(misses))
 	for ch, n := range misses {
@@ -121,8 +151,8 @@ func rankMisses(misses map[rune]int) []CharCount {
 		}
 		return out[i].Char < out[j].Char
 	})
-	if len(out) > 5 {
-		out = out[:5]
+	if len(out) > missCap {
+		out = out[:missCap]
 	}
 	return out
 }
