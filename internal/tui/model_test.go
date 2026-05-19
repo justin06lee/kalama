@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/justin06lee/shaw/internal/history"
 	"github.com/justin06lee/shaw/internal/run"
 )
 
@@ -131,4 +133,24 @@ func TestFooterWordsProgress(t *testing.T) {
 	if !strings.Contains(m.footer(), "1/10 words") {
 		t.Errorf("footer should show 1/10 words after one word, got %q", m.footer())
 	}
+}
+
+func TestFinishWritesHistory(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	m := New(fixedSource{word: "alpha"}, run.ModeWords, 1, 80, 24)
+	for _, ch := range "alpha" {
+		updated, _ := m.Update(keyMsg(string(ch)))
+		m = updated.(Model)
+	}
+	if m.State() != StateResult {
+		t.Fatalf("run did not finish: state %v", m.State())
+	}
+	recs, err := history.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 1 {
+		t.Fatalf("got %d history records, want 1", len(recs))
+	}
+	_ = filepath.Separator // keep filepath import used if trimmed
 }

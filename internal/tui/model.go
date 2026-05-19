@@ -4,6 +4,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/justin06lee/shaw/internal/history"
 	"github.com/justin06lee/shaw/internal/run"
 	"github.com/justin06lee/shaw/internal/stats"
 )
@@ -209,10 +210,22 @@ func (m Model) handleActiveKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// finish computes stats and moves to the result screen.
+// finish computes stats, persists the result, and shows the result screen.
 func (m *Model) finish() {
 	m.result = stats.Compute(m.run)
 	m.state = StateResult
+	modeName := map[run.Mode]string{
+		run.ModeTime: "time", run.ModeWords: "words", run.ModeZen: "zen",
+	}[m.Mode()]
+	_ = history.Append(history.Record{
+		Time:        time.Now(),
+		Mode:        modeName,
+		Target:      m.Target(),
+		NetWPM:      m.result.NetWPM,
+		RawWPM:      m.result.RawWPM,
+		Accuracy:    m.result.Accuracy,
+		Consistency: m.result.Consistency,
+	})
 }
 
 // tickMsg drives the per-second footer/timer while a run is active.
