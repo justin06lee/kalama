@@ -165,10 +165,53 @@ func TestRenderChartEmptyIsBlank(t *testing.T) {
 }
 
 func TestRenderChartPlotsPeak(t *testing.T) {
-	// The tallest bar should reach the top row.
+	// Width 3: column c maps to sample index c*3/3 = c.
+	// The middle column (value 10) is the peak: full height in all 4 rows.
+	// Columns 0 and 2 (value 0) must be entirely blank.
 	out := RenderChart([]float64{0, 10, 0}, 3, 4)
-	top := strings.Split(out, "\n")[0]
-	if !strings.Contains(top, "█") {
-		t.Errorf("peak not plotted in top row: %q", top)
+	rows := strings.Split(out, "\n")
+	if len(rows) != 4 {
+		t.Fatalf("got %d rows, want 4", len(rows))
+	}
+	for r, row := range rows {
+		runes := []rune(row)
+		if len(runes) != 3 {
+			t.Fatalf("row %d width: got %d, want 3", r, len(runes))
+		}
+		if runes[1] != '█' {
+			t.Errorf("row %d col 1: got %q, want '█' (peak column)", r, runes[1])
+		}
+		if runes[0] != ' ' {
+			t.Errorf("row %d col 0: got %q, want ' ' (zero column)", r, runes[0])
+		}
+		if runes[2] != ' ' {
+			t.Errorf("row %d col 2: got %q, want ' ' (zero column)", r, runes[2])
+		}
+	}
+}
+
+func TestRenderChartZeroDimensions(t *testing.T) {
+	defer func() {
+		if p := recover(); p != nil {
+			t.Fatalf("RenderChart panicked with zero dimensions: %v", p)
+		}
+	}()
+	out := RenderChart([]float64{1, 2, 3}, 0, 0)
+	for i, ln := range strings.Split(out, "\n") {
+		if strings.TrimSpace(ln) != "" {
+			t.Errorf("line %d not blank: %q", i, ln)
+		}
+		if strings.Contains(ln, "█") {
+			t.Errorf("line %d contains a bar: %q", i, ln)
+		}
+	}
+}
+
+func TestRenderChartAllZeroSamples(t *testing.T) {
+	out := RenderChart([]float64{0, 0, 0}, 5, 3)
+	for i, ln := range strings.Split(out, "\n") {
+		if strings.Contains(ln, "█") {
+			t.Errorf("line %d contains a bar despite all-zero samples: %q", i, ln)
+		}
 	}
 }
