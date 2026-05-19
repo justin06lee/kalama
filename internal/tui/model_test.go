@@ -2,6 +2,7 @@ package tui
 
 import (
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/justin06lee/shaw/internal/run"
@@ -78,5 +79,30 @@ func TestWordsRunReachingGoalShowsResult(t *testing.T) {
 	}
 	if m.State() != StateResult {
 		t.Errorf("got %v, want StateResult", m.State())
+	}
+}
+
+func TestTickFinishesExpiredTimeRun(t *testing.T) {
+	m := New(fixedSource{word: "alpha"}, run.ModeTime, 30, 80, 24)
+	updated, _ := m.Update(keyMsg("a")) // start the run
+	m = updated.(Model)
+	// Force the run's clock so the goal is met, then deliver a tick.
+	m.Run().Now = func() time.Time { return time.Now().Add(time.Hour) }
+	updated, _ = m.Update(tickMsg(time.Now()))
+	m = updated.(Model)
+	if m.State() != StateResult {
+		t.Errorf("got %v, want StateResult after expiry tick", m.State())
+	}
+}
+
+func TestViewRendersWithoutPanic(t *testing.T) {
+	m := newModel()
+	if m.View() == "" {
+		t.Error("idle view is empty")
+	}
+	updated, _ := m.Update(keyMsg("a"))
+	m = updated.(Model)
+	if m.View() == "" {
+		t.Error("active view is empty")
 	}
 }

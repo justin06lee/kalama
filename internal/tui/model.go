@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/justin06lee/shaw/internal/run"
 	"github.com/justin06lee/shaw/internal/stats"
@@ -70,10 +72,6 @@ func New(src WordSource, mode run.Mode, target, width, height int) Model {
 // Init satisfies tea.Model. The timer tick is started lazily on first keystroke.
 func (m Model) Init() tea.Cmd { return nil }
 
-// View satisfies tea.Model. The real rendering is implemented in Task 11;
-// this placeholder exists only so Model satisfies the tea.Model interface.
-func (m Model) View() string { return "" }
-
 // Accessors used by tests and the view.
 func (m Model) State() State         { return m.state }
 func (m Model) Mode() run.Mode       { return modeOrder[m.modeIdx] }
@@ -113,6 +111,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+	case tickMsg:
+		if m.state == StateActive && m.run.GoalReached() {
+			m.finish()
+			return m, nil
+		}
+		if m.state == StateActive {
+			return m, tick()
+		}
+		return m, nil
 	}
 	return m, nil
 }
@@ -151,7 +158,8 @@ func (m Model) handleIdleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyRunes, tea.KeySpace:
 		m.state = StateActive
-		return m.handleActiveKey(msg)
+		next, _ := m.handleActiveKey(msg)
+		return next, tick()
 	}
 	return m, nil
 }
@@ -205,4 +213,12 @@ func (m Model) handleActiveKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) finish() {
 	m.result = stats.Compute(m.run)
 	m.state = StateResult
+}
+
+// tickMsg drives the per-second footer/timer while a run is active.
+type tickMsg time.Time
+
+// tick schedules the next timer message one second out.
+func tick() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
