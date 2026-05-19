@@ -82,11 +82,18 @@ func TestTextStreamRollsOverToAnotherFile(t *testing.T) {
 	files, _ := Scan(dir)
 
 	s := NewTextStream(files, rand.New(rand.NewSource(1)))
-	// Two single-word files: 10 reads must all succeed (stream is endless).
-	for i := 0; i < 10; i++ {
-		if _, ok := s.Next(); !ok {
+	// Two single-word files ("x" and "y"): the stream is endless, so every
+	// read must succeed. Across many reads it must also draw from BOTH files.
+	seen := map[string]bool{}
+	for i := 0; i < 30; i++ {
+		w, ok := s.Next()
+		if !ok {
 			t.Fatalf("stream ended at read %d, expected endless", i)
 		}
+		seen[w] = true
+	}
+	if !seen["x"] || !seen["y"] {
+		t.Fatalf("expected words from both files, saw %v", seen)
 	}
 }
 
