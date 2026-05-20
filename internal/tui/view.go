@@ -19,17 +19,31 @@ var (
 	styleInactive = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 )
 
+// contentWidth returns the wrapping/chart width with side padding.
+func (m Model) contentWidth() int {
+	w := m.width - 16
+	if w > 64 {
+		w = 64
+	}
+	if w < 24 {
+		w = 24
+	}
+	return w
+}
+
 // View renders the whole screen for the current state.
 func (m Model) View() string {
 	if m.width < minWidth {
 		return "terminal too narrow — widen to at least 40 columns"
 	}
+	var body string
 	switch m.state {
 	case StateResult:
-		return m.resultView()
+		body = m.resultView()
 	default:
-		return m.typingView()
+		body = m.typingView()
 	}
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 }
 
 // typingView renders the config bar, three-line text area, and footer.
@@ -59,7 +73,7 @@ func (m Model) configBar() string {
 			i == m.targetIdx, dim, m.barFocus == 1))
 	}
 	targetCtl := strings.Join(tparts, " ")
-	return "  " + modeCtl + "    " + targetCtl
+	return modeCtl + "    " + targetCtl
 }
 
 // segment styles one config-bar option.
@@ -80,7 +94,7 @@ func segment(label string, selected, dim, focused bool) string {
 // textArea renders the 3-line scrolling viewport of the target text.
 func (m Model) textArea() string {
 	text := m.run.Text()
-	width := m.width - 4
+	width := m.contentWidth()
 	lines := WrapLines(text, width)
 	cursorLine := LineOfCursor(lines, m.run.Cursor())
 	start, count := Viewport(lines, cursorLine)
@@ -104,7 +118,7 @@ func (m Model) textArea() string {
 				b.WriteString(styleDim.Render(ch))
 			}
 		}
-		out = append(out, "  "+b.String())
+		out = append(out, b.String())
 	}
 	return strings.Join(out, "\n")
 }
@@ -131,7 +145,7 @@ func (m Model) footer() string {
 	default: // zen
 		status = fmt.Sprintf("%ds", int(m.run.Elapsed().Seconds()))
 	}
-	return styleDim.Render("  " + status + "   ·   esc to restart")
+	return styleDim.Render(status + "   ·   esc to restart")
 }
 
 // resultView renders metrics, the WPM chart, and the error breakdown.
@@ -139,12 +153,12 @@ func (m Model) resultView() string {
 	r := m.result
 	var b strings.Builder
 	b.WriteString(styleActive.Render(
-		fmt.Sprintf("\n  %.0f wpm   %.0f%% acc\n", r.NetWPM, r.Accuracy*100)))
+		fmt.Sprintf("\n%.0f wpm   %.0f%% acc\n", r.NetWPM, r.Accuracy*100)))
 	b.WriteString(styleDim.Render(fmt.Sprintf(
-		"  raw %.0f   consistency %.0f%%\n\n", r.RawWPM, r.Consistency)))
-	chart := stats.RenderChart(r.Samples, m.width-4, 8)
+		"raw %.0f   consistency %.0f%%\n\n", r.RawWPM, r.Consistency)))
+	chart := stats.RenderChart(r.Samples, m.contentWidth(), 8)
 	for _, ln := range strings.Split(chart, "\n") {
-		b.WriteString("  " + styleCorrect.Render(ln) + "\n")
+		b.WriteString(styleCorrect.Render(ln) + "\n")
 	}
 	b.WriteString("\n")
 	if len(r.MissedChars) > 0 {
@@ -152,8 +166,8 @@ func (m Model) resultView() string {
 		for _, mc := range r.MissedChars {
 			parts = append(parts, fmt.Sprintf("%q×%d", mc.Char, mc.Count))
 		}
-		b.WriteString(styleDim.Render("  missed: " + strings.Join(parts, "  ") + "\n"))
+		b.WriteString(styleDim.Render("missed: " + strings.Join(parts, "  ") + "\n"))
 	}
-	b.WriteString(styleDim.Render("  saved to history   ·   enter for a new run\n"))
+	b.WriteString(styleDim.Render("saved to history   ·   enter for a new run\n"))
 	return b.String()
 }
