@@ -152,3 +152,35 @@ func TestFinishWritesHistory(t *testing.T) {
 		t.Fatalf("got %d history records, want 1", len(recs))
 	}
 }
+
+func TestZenEscFinishesAndSavesHistory(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	m := New(fixedSource{word: "alpha"}, run.ModeZen, 0, 80, 24)
+	// Type a few chars to start the run.
+	for _, ch := range "alp" {
+		updated, _ := m.Update(keyMsg(string(ch)))
+		m = updated.(Model)
+	}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if m.State() != StateResult {
+		t.Fatalf("zen Esc should finish, got state %v", m.State())
+	}
+	recs, err := history.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 1 || recs[0].Mode != "zen" {
+		t.Fatalf("expected 1 zen history record, got %+v", recs)
+	}
+}
+
+func TestZenEscWithoutTypingResets(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	m := New(fixedSource{word: "alpha"}, run.ModeZen, 0, 80, 24)
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc}) // idle Esc just regenerates text
+	m = updated.(Model)
+	if m.State() != StateIdle {
+		t.Fatalf("idle zen Esc should stay idle, got %v", m.State())
+	}
+}

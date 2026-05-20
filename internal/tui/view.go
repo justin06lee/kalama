@@ -155,7 +155,8 @@ func (m Model) resultView() string {
 	b.WriteString(styleActive.Render(
 		fmt.Sprintf("\n%.0f wpm   %.0f%% acc\n", r.NetWPM, r.Accuracy*100)))
 	b.WriteString(styleDim.Render(fmt.Sprintf(
-		"raw %.0f   consistency %.0f%%\n\n", r.RawWPM, r.Consistency)))
+		"raw %.0f   consistency %.0f%%   %ds\n\n",
+		r.RawWPM, r.Consistency, int(m.run.Duration().Seconds()))))
 	chart := stats.RenderChart(r.Samples, m.contentWidth(), 8)
 	for _, ln := range strings.Split(chart, "\n") {
 		b.WriteString(styleCorrect.Render(ln) + "\n")

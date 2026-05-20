@@ -185,7 +185,13 @@ func wrap(i, n int) int {
 func (m Model) handleActiveKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc:
-		m.resetRun() // abort, no stats saved
+		// Zen has no natural end — Esc finishes and records stats.
+		// Time/Words runs are aborted by Esc with no result saved.
+		if m.Mode() == run.ModeZen && m.run.Started() {
+			m.finish()
+		} else {
+			m.resetRun()
+		}
 		return m, nil
 	case tea.KeyBackspace:
 		m.run.Backspace()
