@@ -46,12 +46,22 @@ func (m Model) View() string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body)
 }
 
-// typingView renders the config bar, three-line text area, and footer.
+// typingView renders the config bar, an idle-only hint, the text area, and the footer.
 func (m Model) typingView() string {
 	bar := m.configBar()
+	hint := m.configHint()
 	text := m.textArea()
 	footer := m.footer()
-	return strings.Join([]string{"", bar, "", text, "", footer}, "\n")
+	return strings.Join([]string{"", bar, hint, "", text, "", footer}, "\n")
+}
+
+// configHint shows the config-bar key bindings while idle. When a run is
+// active the line is left blank so it disappears from view.
+func (m Model) configHint() string {
+	if m.state != StateIdle {
+		return ""
+	}
+	return styleDim.Render("tab to switch  ·  ← → to change  ·  type to start")
 }
 
 // configBar renders the mode and target segmented controls.
@@ -145,7 +155,16 @@ func (m Model) footer() string {
 	default: // zen
 		status = fmt.Sprintf("%ds", int(m.run.Elapsed().Seconds()))
 	}
-	return styleDim.Render(status + "   ·   esc to restart")
+	hint := "esc for fresh text"
+	switch m.state {
+	case StateActive:
+		if m.Mode() == run.ModeZen {
+			hint = "esc to finish"
+		} else {
+			hint = "esc to abort"
+		}
+	}
+	return styleDim.Render(status + "   ·   " + hint)
 }
 
 // resultView renders metrics, the WPM chart, and the error breakdown.
