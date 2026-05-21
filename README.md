@@ -2,12 +2,14 @@
   <img src="docs/img/shaw.png" width="360" alt="shaw">
 </p>
 
-# shaw
+<h1 align="center">shaw</h1>
 
-A monkeytype-style touch-typing trainer that lives in your terminal and sources
-text from a folder of your own `.txt` files. Three run modes (timed, word-count,
-zen), live WPM and accuracy, an ASCII WPM chart, error breakdown, and a
-persistent history across sessions.
+<p align="center">
+  A monkeytype-style touch-typing trainer that lives in your terminal and sources
+  text from a folder of your own <code>.txt</code> files. Three run modes (timed,
+  word-count, zen), live WPM and accuracy, an ASCII WPM chart, error breakdown,
+  and a persistent history across sessions.
+</p>
 
 ## Install
 
