@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/img/shaw.png" width="160" alt="shaw">
+</p>
+
 # shaw
 
 A monkeytype-style touch-typing trainer that lives in your terminal and sources
