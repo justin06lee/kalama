@@ -101,6 +101,22 @@ func segment(label string, selected, dim, focused bool) string {
 	return st.Render(label)
 }
 
+// spaceGlyph is the placeholder drawn for a space you still owe, so the gaps
+// between words are visible instead of blank. It collapses back to a real blank
+// once that space is typed correctly.
+const spaceGlyph = "_"
+
+// displayGlyph returns the string shown for a target rune in the given typed
+// state. A space renders as spaceGlyph while untyped, at the cursor, or
+// mistyped; a correctly typed space renders as a real blank so finished text
+// reads naturally. Every other rune renders as itself.
+func displayGlyph(ch rune, state run.CharState) string {
+	if ch == ' ' && state != run.Correct {
+		return spaceGlyph
+	}
+	return string(ch)
+}
+
 // textArea renders the 3-line scrolling viewport of the target text.
 func (m Model) textArea() string {
 	text := m.run.Text()
@@ -116,7 +132,7 @@ func (m Model) textArea() string {
 		ln := lines[i]
 		var b strings.Builder
 		for j := ln.Start; j < ln.End; j++ {
-			ch := string(text[j])
+			ch := displayGlyph(text[j], states[j])
 			switch {
 			case j == cursor:
 				b.WriteString(styleActive.Render(ch))
