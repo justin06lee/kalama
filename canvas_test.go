@@ -1,6 +1,9 @@
 package shaw
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 func TestNewCanvasForcesEvenHeight(t *testing.T) {
 	c := NewCanvas(4, 3)
@@ -37,6 +40,23 @@ func TestClearFillsEveryPixel(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestBlitSkipsTransparentAndClips(t *testing.T) {
+	s, err := LoadSprite(bytes.NewReader(makePNG(t))) // 2x1: red, transparent
+	if err != nil {
+		t.Fatalf("LoadSprite: %v", err)
+	}
+	c := NewCanvas(2, 2)
+	c.Clear(Color{B: 255, A: 255}) // blue background
+	c.Blit(s, 0, 0)
+	if got := c.at(0, 0); got != (Color{R: 255, A: 255}) {
+		t.Errorf("at(0,0) = %+v, want red (opaque sprite pixel)", got)
+	}
+	if got := c.at(1, 0); got != (Color{B: 255, A: 255}) {
+		t.Errorf("at(1,0) = %+v, want blue (transparent sprite pixel skipped)", got)
+	}
+	c.Blit(s, 5, 5) // fully off-canvas: must not panic
 }
 
 func TestRenderHalfBlockOneCell(t *testing.T) {

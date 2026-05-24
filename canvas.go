@@ -46,6 +46,16 @@ func (c *Canvas) Clear(col Color) {
 // at returns the stored color at (x,y). Test helper; assumes in bounds.
 func (c *Canvas) at(x, y int) Color { return c.pixels[y*c.w+x] }
 
+// Blit draws sprite s with its top-left corner at (x,y). Transparent sprite
+// pixels are skipped and pixels outside the canvas are clipped, both via Set.
+func (c *Canvas) Blit(s *Sprite, x, y int) {
+	for sy := 0; sy < s.h; sy++ {
+		for sx := 0; sx < s.w; sx++ {
+			c.Set(x+sx, y+sy, s.pixels[sy*s.w+sx])
+		}
+	}
+}
+
 // Render draws the canvas as an ANSI truecolor string. Each terminal cell is
 // the upper-half-block glyph ▀ with the top pixel as foreground and the bottom
 // pixel as background, giving two vertical pixels per cell. Cell rows are joined
