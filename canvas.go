@@ -1,5 +1,10 @@
 package shaw
 
+import (
+	"fmt"
+	"strings"
+)
+
 // Canvas is a width x height grid of pixels. Height is always even: each
 // terminal cell row holds two vertical pixels (see Render).
 type Canvas struct {
@@ -40,3 +45,35 @@ func (c *Canvas) Clear(col Color) {
 
 // at returns the stored color at (x,y). Test helper; assumes in bounds.
 func (c *Canvas) at(x, y int) Color { return c.pixels[y*c.w+x] }
+
+// Render draws the canvas as an ANSI truecolor string. Each terminal cell is
+// the upper-half-block glyph ▀ with the top pixel as foreground and the bottom
+// pixel as background, giving two vertical pixels per cell. Cell rows are joined
+// by newlines with no trailing newline; each row ends with an SGR reset.
+func (c *Canvas) Render() string {
+	var b strings.Builder
+	rows := c.h / 2
+	for r := 0; r < rows; r++ {
+		for x := 0; x < c.w; x++ {
+			top := c.opaque(x, 2*r)
+			bot := c.opaque(x, 2*r+1)
+			fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀",
+				top.R, top.G, top.B, bot.R, bot.G, bot.B)
+		}
+		b.WriteString("\x1b[0m")
+		if r < rows-1 {
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
+}
+
+// opaque returns the color at (x,y) for rendering: transparent pixels render as
+// black so every cell has a concrete foreground and background color.
+func (c *Canvas) opaque(x, y int) Color {
+	px := c.pixels[y*c.w+x]
+	if px.A == 0 {
+		return Color{}
+	}
+	return px
+}
