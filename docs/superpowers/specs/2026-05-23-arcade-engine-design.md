@@ -1,47 +1,66 @@
-# Arcade Engine — Design Spec
+# shaw — Arcade Engine Design Spec
 
 Date: 2026-05-23
 Status: approved for planning
-Scope: the **engine** module only (first sub-project of the arcade ecosystem)
+Scope: the **shaw engine** — this repo, gutted and replaced with the engine SDK
 
-## Context: the arcade ecosystem
+## Decision: shaw IS the engine
 
-`shaw` is becoming a terminal arcade rather than a single typing trainer. The
-system splits into five modules, built inside-out (something that *runs* before
-something that *distributes*):
+`shaw` stops being a typing trainer and becomes the **arcade engine itself** —
+the foundation every game is built on. The current contents of this repo (the
+typing-trainer app: `main.go`, `internal/*`) are removed and replaced with the
+engine SDK. The trainer is not lost; it stays in git history and is reborn later
+as a *game* built on shaw.
+
+Games import the engine as the top-level package:
+
+```go
+import "github.com/justin06lee/shaw"
+
+func main() {
+    shaw.Run(myGame, shaw.Options{FPS: 30})
+}
+```
+
+There is no separate engine repo. shaw is the engine.
+
+## The arcade ecosystem
 
 | Module | Repo | Role |
 |--------|------|------|
-| engine | own repo (name TBD, placeholder `tarso`) | the arcade SDK: canvas, loop, input, sprite, data |
-| games | per-game repos / dirs | standalone binaries that import the engine (typing trainer first, fighter later) |
-| shaw | this repo, repurposed | launcher: scan installed games, draw a menu, exec the pick, return on exit |
+| **shaw** | this repo | the engine SDK — canvas, loop, input, sprite, data. Games import it. |
+| games | per-game repos | standalone binaries that import shaw (typing trainer reborn first, fighter later) |
+| launcher | TBD (own repo, or folded into kalama) | scans installed games, draws a menu, exec's the pick, returns on exit |
 | kalama | own repo | package manager: pull games from hegale, install/remove/list locally |
 | hegale | own repo | registry: a JSON index + per-OS binaries |
 
 **Execution model (decided): separate binaries.** Each game is a standalone
-compiled program. `kalama` installs prebuilt binaries per OS into
-`~/.kalama/games/<game>/`. `shaw` scans that directory and `exec`s the chosen
-binary; the game owns the terminal while running and returns control to the
-launcher on exit.
+compiled program that imports shaw. The package manager installs prebuilt
+binaries per OS into `~/.kalama/games/<game>/`. A launcher scans that directory
+and `exec`s the chosen binary; the game owns the terminal while running and
+returns control to the launcher on exit.
 
 **Game ↔ launcher contract (decided): games own their data.** The launcher only
-launches and returns. There is no score back-channel. Each game persists its own
-scores/history under a standard data directory the engine provides. `shaw` and
-`kalama` never call each other — they meet at the filesystem.
+launches and returns — no score back-channel. Each game persists its own
+scores/history under a standard data directory the engine provides. The launcher
+and kalama never call each other; they meet at the filesystem.
 
-**Build order:** engine → port the typing trainer onto it → shaw launcher
-(scans local dir) → kalama → hegale. A playable local arcade exists before any
-networking.
+**Note on the launcher:** it is no longer shaw (shaw is the engine now). Its home
+is deferred — likely its own small repo or a subcommand of kalama. Not part of
+this spec.
 
-This spec covers only the **engine**. Each later module gets its own spec.
+**Build order:** ship the shaw engine → rebuild the typing trainer as the first
+game on it (proves the engine real) → launcher → kalama → hegale. A playable
+local arcade exists before any networking.
+
+This spec covers only the **shaw engine**. Each later module gets its own spec.
 
 ## Engine purpose
 
-A Go library that lets a game be written as a small `Game` implementation while
-the engine owns the terminal, a fixed-timestep loop, input state, a pixel
-canvas, and per-game persistence. Built on `bubbletea` (reuses its terminal
-setup, alt-screen, resize handling, and input decoding — already a dependency of
-shaw).
+A Go package that lets a game be written as a small `Game` implementation while
+shaw owns the terminal, a fixed-timestep loop, input state, a pixel canvas, and
+per-game persistence. Built on `bubbletea` (reuses its terminal setup,
+alt-screen, resize handling, and input decoding).
 
 Both paradigms are served by the same engine:
 - **Text games** (typing trainer) use loop + input + datadir, rendering with
@@ -50,8 +69,10 @@ Both paradigms are served by the same engine:
 
 ## Public API
 
+Package name is `shaw`; callers reference `shaw.Canvas`, `shaw.Run`, etc.
+
 ```go
-package engine
+package shaw
 
 // ---- Canvas: pixel buffer drawn with half-blocks (2 px per terminal cell) ----
 type Color struct{ R, G, B, A uint8 } // A == 0 means transparent
@@ -137,7 +158,7 @@ produced ANSI byte string for small canvases.
    `Update(dt, in)`.
 3. If `Update` returns `Quit` (or Ctrl-C arrives), stop and restore the
    terminal, returning from `Run`. For an exec'd game this hands control back to
-   the shaw launcher.
+   the launcher.
 4. `View` calls `Draw(canvas)` then `canvas.Render()`.
 
 Sizing: when `Width`/`Height` are 0, the canvas auto-sizes to the terminal
@@ -179,14 +200,14 @@ sprite at an offset, skipping transparent pixels and clipping at canvas edges.
 ### Data
 
 `DataDir(game)` returns and creates `$KALAMA_DATA_DIR/<game>/`, falling back to
-`~/.kalama/data/<game>/` when the env var is unset. This generalizes the existing
-XDG-aware, corruption-tolerant persistence pattern already used by shaw's
+`~/.kalama/data/<game>/` when the env var is unset. This generalizes the
+XDG-aware, corruption-tolerant persistence pattern the old trainer used in its
 `history`/`config` packages; games store their own scores/history here.
 
 ## The manifest (contract, not engine code)
 
-`shaw` discovers games and `kalama` installs them by agreeing on a JSON file the
-package manager writes alongside each installed binary:
+The launcher discovers games and `kalama` installs them by agreeing on a JSON
+file the package manager writes alongside each installed binary:
 
 ```
 ~/.kalama/games/<game>/
@@ -203,22 +224,26 @@ package manager writes alongside each installed binary:
 }
 ```
 
-`shaw` reads each `manifest.json` to build its menu and `exec`s
-`<dir>/<binary>`. This schema is **documented here but is not part of the engine
-library** — `shaw` doesn't import the engine (only games do), so each side
-defines its own struct against this shared JSON shape. The schema is owned by the
-kalama/hegale specs; it appears here only to make the engine's place in the
-system clear.
+The launcher reads each `manifest.json` to build its menu and `exec`s
+`<dir>/<binary>`. This schema is **documented here but is not part of the shaw
+engine** — the launcher doesn't import shaw, only games do. The schema is owned
+by the kalama/hegale specs; it appears here only to make the engine's place in
+the system clear.
 
 ## v1 scope
 
 **In:** `Canvas` (+ `Render`), `Sprite` (PNG load + `Blit`), `Run` loop,
 `Input` with the timeout-decay fallback, `DataDir`.
 
+**The repo migration is part of v1:** delete the existing trainer
+(`main.go`, `internal/`, trainer-specific Makefile/README sections) and replace
+the module's contents with the engine package. Keep the module path
+`github.com/justin06lee/shaw`. The trainer remains recoverable from git history.
+
 **Deferred (explicitly out of v1):**
 - Sound.
 - True key press/release via kitty protocol (fallback ships first).
-- Any networking, registry, or package-management code (separate modules).
+- The launcher, games, kalama, hegale (separate modules / specs).
 
 ## Testing strategy
 
@@ -228,7 +253,7 @@ system clear.
 - **Sprite:** decode a tiny in-memory PNG, assert dimensions and that
   alpha-0 pixels become transparent.
 - **Input:** drive the fallback with a synthetic, injectable clock (mirror the
-  `run` package's injectable `Now`) — feed press/repeat events and assert
+  old `run` package's injectable `Now`) — feed press/repeat events and assert
   `Held/Pressed/Released` transitions across frames and across the decay
   boundary.
 - **DataDir:** point `KALAMA_DATA_DIR` at a temp dir, assert path + creation.
@@ -238,8 +263,10 @@ system clear.
 
 ## Open questions (resolve during planning)
 
-1. Engine module/repo name (placeholder `tarso`).
-2. Exact decay window for the input fallback (start ~150 ms; tune in the spike).
-3. Whether `Run` should expose the raw terminal size to the game beyond canvas
+1. Exact decay window for the input fallback (start ~150 ms; tune in the spike).
+2. Whether `Run` should expose raw terminal size to the game beyond canvas
    dimensions (probably not in v1).
+3. Home of the launcher (own repo vs kalama subcommand) — out of scope here, but
+   affects how the typing trainer is run during early development (likely a
+   throwaway `go run` harness until the launcher exists).
 ```
