@@ -1,4 +1,4 @@
-package shaw
+package kalama
 
 import (
 	"os"
@@ -8,7 +8,7 @@ import (
 
 func TestDataDirUsesEnvAndCreates(t *testing.T) {
 	base := t.TempDir()
-	t.Setenv("KALAMA_DATA_DIR", base)
+	t.Setenv("SHAW_DATA_DIR", base)
 	dir, err := DataDir("fighter")
 	if err != nil {
 		t.Fatalf("DataDir: %v", err)

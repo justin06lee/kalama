@@ -1,4 +1,4 @@
-package shaw
+package kalama
 
 import (
 	"image/color"

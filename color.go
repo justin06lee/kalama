@@ -1,4 +1,4 @@
-package shaw
+package kalama
 
 // Color is an RGBA color. A == 0 means fully transparent; the canvas renders
 // transparent pixels as black, and Set ignores them so sprites can carry holes.

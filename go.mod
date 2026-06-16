@@ -1,4 +1,4 @@
-module github.com/justin06lee/shaw
+module github.com/justin06lee/kalama
 
 go 1.26.2
 
